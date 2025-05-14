@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TailwindMerge\Laravel;
 
+use Psr\SimpleCache\CacheInterface;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
 use Illuminate\View\Compilers\BladeCompiler;
 use Illuminate\View\ComponentAttributeBag;
@@ -14,10 +16,19 @@ class TailwindMergeServiceProvider extends BaseServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(TailwindMergeContract::class, static fn (): TailwindMerge => TailwindMerge::factory()
+        $cacheStore = $this->getCacheStore();
+
+        if($cacheStore !== null) {
+            $this->app->singleton(TailwindMergeContract::class, static fn (): TailwindMerge => TailwindMerge::factory()
             ->withConfiguration(config('tailwind-merge', []))
-            ->withCache(app('cache')->store()) // @phpstan-ignore-line
+            ->withCache($cacheStore)
             ->make());
+        } else {
+            $this->app->singleton(TailwindMergeContract::class, static fn (): TailwindMerge => TailwindMerge::factory()
+            ->withConfiguration(config('tailwind-merge', []))
+            ->make());
+        }
+        
 
         $this->app->alias(TailwindMergeContract::class, 'tailwind-merge');
         $this->app->alias(TailwindMergeContract::class, TailwindMerge::class);
@@ -90,4 +101,13 @@ class TailwindMergeServiceProvider extends BaseServiceProvider
             'tailwind-merge',
         ];
     }
+
+    protected function getCacheStore(): CacheInterface|null
+    {
+        /** @var string|null $storage */
+        $storage = config('tailwind-merge.cache_store');
+
+        return $storage ? Cache::store($storage) : null;
+    }
 }
+ 
